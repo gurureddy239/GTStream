@@ -1,4 +1,4 @@
-GTStream is the first scalable big data streaming benchmark created by CERCS Lab in Georgia Institute of Technology.
+GTStream is a scalable big data streaming benchmark created by CERCS Lab in Georgia Institute of Technology.
 
 The packages required
 
