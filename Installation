@@ -1,0 +1,89 @@
+Step 1. Install HDFS (following steps happen on HDFS Master)
+
+0) The typical installation is trivial. But you should be really careful about the version of HDFS to choose. According to http://hbase.apache.org/book/hadoop.html. Hadoop 0.20.2, Hadoop 0.20.203.0, and Hadoop 0.20.204.0 DO NOT have durable sync implementation, which means those versions can not be used in HBase installation. However, in my legacy system. we are using Hadoop 0.20.2. So my hypothesis is we used cloudera version of hadoop (according to "Or use the Cloudera or MapR distributions. Cloudera' CDH3 is Apache Hadoop 0.20.x plus patches including all of the branch-0.20-append additions needed to add a durable sync. Use the released, most recent version of CDH3.") . Secondly, you need to enable sync by setting dfs.support.append equal to true on both the client side -- in hbase-site.xml -- and on the serverside in hdfs-site.xml (The sync facility HBase needs is a subset of the append code path). Surprisingly, we did not have that set, neither in legacy system. I think maybe we used Cloudera version, so we dont need to enable it. Unfortunately, these days, when I need to install a small version of Flume+HBase+HDFS, I cannot find Cloudera version any more, so I need to use both the latest version of HDFS (1.0.3) and HBase(0.92.1). I tried only use latest version of HDFS but stay with HBase (0.90.4) because I suspect the Flume HBase plugin may not work with new version, but HBase (0.90.4) did not work with HDFS(1.0.3)....so I have to use both of them in latest version.
+
+Following are the steps to RUN from Scratch, note that , they are recorded in the legacy system, should be easy to infer the steps in new smaller system I am building now.  
+
+1) stop previously running HDFS instance by running '/root/hadoop-dfs/hadoop-0.20.2/bin/stop-dfs.sh'
+2) remove local data dir on EVERY data node by 'rm -rf /root/hadoop-dfs/hadoop-root' and then create a new by 'mkdir /root/hadoop-dfs/hadoop-root'. You may need to use pssh to automate.
+3) remove local pid dir on EVERY data node by 'rm -rf /root/hadoop-dfs/pids' and then create a new by 'mkdir /root/hadoop-dfs/pids'. You may need to use pssh to automate.
+4) format namenode by running '/root/hadoop-dfs/hadoop-0.20.2/bin/hadoop namenode -format'
+5) start HDFS instance by running '/root/hadoop-dfs/hadoop-0.20.2/bin/start-dfs.sh'
+6) create a HDFS dir '/user/root/hbase' by running '/root/hadoop-dfs/hadoop-0.20.2/bin/hadoop dfs -mkdir hbase' (I believe /user/root is the default dir)
+7) check HDFS health states by running 'lynx http://jedi005-vm1.cc.gatech.edu:50070'
+
+Step 2. Install HBase
+
+0) Following HBase manual should lead you to success. Beside the caveat in HDFS step(0), you should really be careful about things i) the hbase-site.xmls in a master and a regionserver are different. Master has all kinds of DNS configuration which basically has the master's hostname as input. In regionserver, you should remove those properties, otherwise the regionserver cannot be started because of the errors like following
+
+"
+12/06/08 19:02:07 ERROR regionserver.HRegionServer: Failed init
+..
+java.net.BindException: Cannot assign requested address
+"
+ii) give >5G memory to regionserver. otherwise, it becomes really really slow.
+iii) maybe it is a good idea to put regionserver and zookeeper at the same host if you want a compact version of HBase.
+
+1) stop previous running regionservers by running '/root/hbase_latest/hbase-0.90.4/bin/hbase-daemon.sh stop regionserver' on EACH regionserver node. On each node, I have a shell script named /root/hbase_latest/hbase-0.90.4/stopRegionServer.sh. Then I wrote a perl script at one controller machine, automating the process by running  "ssh ".$node_list[$i]." /root/hbase_latest/hbase-0.90.4/stopRegionServer.sh"
+
+2) stop previous running HBase master by running '/root/hbase_latest/hbase-0.90.4/bin/hbase-daemon.sh stop master'
+
+3) stop previous running zookeeper by running '/root/zookeeper-3.3.3/bin/zkServer.sh stop' on EACH zookeeper node (presumably odd # of zookeepers).
+
+4) remove content in local dir for EACH zookeeper by running 'cd /root/zookeeper/version-2; rm -rf *'.  /root/zookeeper is on every zookeeper, there are an auto-generated file 'myid' (which I dont know how it was generated) and a dir 'version-2'.
+
+5) start zookeeper by running  '/root/zookeeper-3.3.3/bin/zkServer.sh start&' on EACH zookeeper node ('&' is important to make it running as daemon, otherwise when you shut the console zookeeper will stop)
+
+6) start HBase master by running '/root/hbase_latest/hbase-0.90.4/bin/hbase-daemon.sh start master'
+
+7) start regionservers by running '/root/hbase_latest/hbase-0.90.4/bin/hbase-daemon.sh start regionserver' on EACH regionserver node (Note the regionserver does not have to be in the HBase master 'regionservers' file in 'conf' dir, any appropriately configured regionserver can join HBase by just running it). On each node, I have a shell script named /root/hbase_latest/hbase-0.90.4/startRegionServer.sh. Then I wrote a perl script at one controller machine, automating the process by running  "ssh ".$node_list[$i]." /root/hbase_latest/hbase-0.90.4/startRegionServer.sh"
+
+8) check HBase health states by running 'lynx http://jedi005-vm1.cc.gatech.edu:60010', also running '/root/hbase_latest/hbase-0.90.4/bin/hbase shell' to login HBase management console. Should be able to run ' list' if HBase is well.
+
+9) create new table by running (assuming there is an old table 'test', if isn't ignore first two commands)
+
+scan 'test'
+disable 'test'; drop 'test'
+create 'test', 'log' (create a table named mytest, with a column family log)
+
+
+Step 3. Install Flume
+
+0) the keys of the installing process are following i) the hbase_sink plugin actually works for latest hbase and hdfs! (I meant the apache hbase and hdfs). You just need to make sure to include the hbase conf directory in the FLUME_CLASSPATH, and the RIGHT version of hbase-x-xx.jar as well! (i came across errors when only updated the former, and i thought the plugin could not work with latest HBase and HDFS). ii) make sure to remove  everything 'flume.master.zk.logdir' iii) use following config commands to setup agent and collector and link the two.
+
+AGENT:
+ exec config jedi005-vm12.cc.gatech.edu 'tailDir("/root/flume/cheng/testlogs",".*\\.hb")' 'agentBEChain("jedi005-vm11.cc.gatech.edu:35853","put recovery collector here, if N/A, leave blank")
+
+COLLECTOR:
+exec config collector5 collectorSource 'hbase("test","%{body}","log","body","%{body}")'
+
+1) Flume master can run non-stop. Nothing need to be done after configuring and running it.
+
+2) Stop EACH collector by running ' "ssh ".$node_list[$i]." /root/flume/dani/flume-distribution-0.9.5-SNAPSHOT//bin/flume-daemon.sh stop node -n collector".$host_num; ' ( this is the code in an automation perl code. node_list is the list of collectors. '/root/flume/dani/flume-distribution-0.9.5-SNAPSHOT//bin/flume-daemon.sh stop node -n collector$host_num' is the actual command if you chose to login to each machine and stop locally. collector$host_num is the name of the collector, I named it by collector+host number, for instance, collector1 means the collector running on jedi001)
+
+3) Stop EACH agent by running ' "ssh ".$node_list[$i]." /root/flume/dani/flume-distribution-0.9.5-SNAPSHOT/bin/flume-daemon.sh stop node"' ( this is the code in an automation perl code. node_list is the list of agents. '/ /root/flume/dani/flume-distribution-0.9.5-SNAPSHOT/bin/flume-daemon.sh stop node' is the actual command if you chose to login to each machine and stop locally.)
+
+ 4) Start EACH collector by running ' "ssh ".$node_list[$i]." /root/flume/dani/flume-distribution-0.9.5-SNAPSHOT//bin/flume-daemon.sh start node -n collector".$host_num; ' ( this is the code in an automation perl code. node_list is the list of collectors. '/root/flume/dani/flume-distribution-0.9.5-SNAPSHOT//bin/flume-daemon.sh start node -n collector$host_num' is the actual command if you chose to login to each machine and start locally. collector$host_num is the name of the collector, I named it by collector+host number, for instance, collector1 means the collector running on jedi001)
+
+
+5) Start EACH agent by running ' "ssh ".$node_list[$i]." /root/flume/dani/flume-distribution-0.9.5-SNAPSHOT/bin/flume-daemon.sh start node"' ( this is the code in an automation perl code. node_list is the list of agents. '/ /root/flume/dani/flume-distribution-0.9.5-SNAPSHOT/bin/flume-daemon.sh stop node' is the actual command if you chose to login to each machine and start locally.)
+
+6) Check Flume Health by  lynx http://jedi005-vm2.cc.gatech.edu:35871, all the agents and collectors should be in active states, ideally. 
+
+Test the whole system
+
+1) remove the previous test files on EACH Flume agent node, by running 
+
+pssh -h flume_agents 'rm -rf /root/flume/cheng/testlogs/test.hb' 
+
+
+*to remove logs run*
+
+
+pssh -h flume_agents 'rm -rf /root/flume/dani/flume-distribution-0.9.5-SNAPSHOT/logs/*'
+pssh -h flume_collectors 'rm -rf /root/flume/dani/flume-distribution-0.9.5-SNAPSHOT/logs/*'
+pssh -h regionservers 'rm -rf /root/hbase_latest/hbase-0.90.4/logs/*'
+
+
+2) On ANY agent node, run 'echo chengwei > test.hb' at the dir '/root/flume/cheng/testlogs/'. Then 'scan 'test' ' in HBase shell to see if 'chengwei' record shows up.
+
