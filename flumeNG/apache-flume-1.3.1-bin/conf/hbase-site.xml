@@ -1,0 +1,89 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!--
+/**
+ * Copyright 2009 The Apache Software Foundation
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+-->
+<configuration>
+<property>
+    <name>hbase.rootdir</name>
+    <value>hdfs://jedi005-vm3.cc.gatech.edu:54310/root/user/hbase</value>
+    <description>The directory shared by region servers.
+    Should be fully-qualified to include the filesystem to use.
+    E.g: hdfs://NAMENODE_SERVER:PORT/HBASE_ROOTDIR
+    </description>
+  </property>
+<property>
+    <name>hbase.tmp.dir</name>
+    <value>/root/hbase_latest/data/tmp/hbase-${user.name}</value>
+    <description>Temporary directory on the local filesystem.</description>
+  </property>
+<property>
+    <name>hbase.zookeeper.dns.interface</name>
+    <value>jedi005-vm4.cc.gatech.edu</value>
+    <description>The name of the Network Interface from which a ZooKeeper server
+      should report its IP address.
+    </description>
+  </property>
+<property>
+    <name>hbase.master.info.bindAddress</name>
+    <value>jedi005-vm4.cc.gatech.edu</value>
+    <description>The address for the hbase master web UI
+    </description>
+  </property>
+<property>
+    <name>hbase.regionserver.info.bindAddress</name>
+    <value>jedi005-vm4.cc.gatech.edu</value>
+    <description>The address for the hbase regionserver web UI
+    </description>
+  </property>
+<property>
+    <name>hbase.cluster.distributed</name>
+    <value>true</value>
+    <description>The mode the cluster will be in. Possible values are
+      false: standalone and pseudo-distributed setups with managed Zookeeper
+      true: fully-distributed with unmanaged Zookeeper Quorum (see hbase-env.sh)
+    </description>
+  </property>
+<property>
+    <name>hbase.zookeeper.quorum</name>
+    <value>jedi005-vm6.cc.gatech.edu,jedi005-vm7.cc.gatech.edu,jedi005-vm8.cc.gatech.edu</value>
+    <description>The directory shared by RegionServers.
+    </description>
+  </property>
+<property>
+    <name>hbase.zookeeper.property.dataDir</name>
+    <value>/var/zookeeper_latest</value>
+    <description>Property from ZooKeeper's config zoo.cfg.
+    The directory where the snapshot is stored.
+    </description>
+  </property>
+<property>
+      <name>hbase.zookeeper.property.clientPort</name>
+      <value>2181</value>
+      <description>Property from ZooKeeper's config zoo.cfg.
+      The port at which the clients will connect.
+      </description>
+    </property>
+<property>
+    <name>dfs.support.append</name>
+    <value>true</value>
+  </property>
+</configuration>
